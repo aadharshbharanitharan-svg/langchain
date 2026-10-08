@@ -20,8 +20,6 @@ sources:
     resource: repo://libs/partners/anthropic/langchain_anthropic/data/profile_augmentations.toml
   - id: openwiki-source-04e3ac4f56ff2adb2b02de7d
     resource: repo://libs/partners/anthropic/pyproject.toml
-  - id: openwiki-source-8641a971af4f11b852966d77
-    resource: repo://libs/partners/openai/langchain_openai/chat_models/__init__.py
   - id: openwiki-source-3bc725a9a39d534be6f46d18
     resource: repo://libs/partners/openai/langchain_openai/chat_models/_compat.py
   - id: openwiki-source-738512768ef81ae009b097ac
@@ -36,10 +34,10 @@ sources:
     resource: repo://libs/partners/openai/tests/unit_tests/chat_models/test_responses_standard.py
   - id: openwiki-source-025cad4ae99967890152b7e0
     resource: repo://libs/standard-tests/README.md
-generated: { by: "openwiki/0.5.0", at: "2026-09-22T08:27:06.345Z" }
+generated: { by: "openwiki/0.5.0", at: "2026-10-08T08:29:58.787Z" }
 verified:
   - by: openwiki/0.5.0
-    at: 2026-09-28T08:35:20.640Z
+    at: 2026-10-08T08:29:58.787Z
 ---
 
 ## Overview
@@ -108,7 +106,7 @@ requires-python = ">=3.10.0,<4.0.0"
 version = "0.1.0"
 
 dependencies = [
-    "langchain-core>=1.6.2,<2.0.0",           # Required: base LangChain
+    "langchain-core>=1.6.6,<2.0.0",           # Required: base LangChain
     "provider-client-library>=2.45.0,<4.0.0", # Provider's own SDK (pinned version)
     "certifi>=2024.6.2",                      # SSL certificates
 ]

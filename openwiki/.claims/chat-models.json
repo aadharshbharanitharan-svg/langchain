@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:0cd7a2ec4f34f1d485e9a9337aa08d82714284546d8ce04609d9de1a0f58d76e",
+  "pageVersion": "sha256:c3dcf3e103cd3e47125d69865dfb3c843f96d087a1761d6aef11bdfb369f32a3",
   "claims": [
     {
       "id": "claim_d2cdcf05dd4149bb9ea0a5fb0d1568d8",
@@ -82,11 +82,11 @@
     },
     {
       "id": "claim_2c69747d436f4b7e87260f3b184a7875",
-      "statement": "_generate_with_cache() and _agenerate_with_cache() wrap the core generation methods to transparently check and populate prompt caches via self.cache or get_llm_cache(). Cache hits replay v2 events if attached handlers support them, providing transparent caching with consistent callback behavior.",
+      "statement": "_generate_with_cache() and _agenerate_with_cache() wrap the core generation methods to transparently check and populate prompt caches via self.cache or get_llm_cache(). Cache hits replay v2 events via _replay_v2_events_for_cache_hit() if attached handlers support them, providing transparent caching with consistent callback behavior. Cache misses route through v2 protocol streaming (_should_use_protocol_streaming), v1 callback streaming (_should_stream), or direct generation, with rate limiting applied after cache checks.",
       "evidence": [
         {
           "resource": "repo://libs/core/langchain_core/language_models/chat_models.py#L1892-L2206",
-          "version": "repo-lines-v1:sha256:8875e363badb600e00e7b80f354fca72b52ecd03e88a1c87cc770026fe10e7cc:eyJzZWxlY3RlZExpbmVDb3VudCI6MzE1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwMzVhNGQ1NGU3ZGUxYTdmYjE3YjU4OTllNWFkMjMwMWMwZGEwODlhOGVkYmMxMWU4N2NlOGViNzFiMzcwMGZkIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI3NzJmOTY5NWM3NDY3Yzc0NzczYzljZTdmYzQyOWM1ZDBkMGU0ODdmM2M1MWQxNWQ2NjY4YTNkMjQwNzJiYjk1IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJjMTQyMzMyMGQ3N2NlMTg4MDY2OTBlZmRiOGUwOWZjNmU3MjZiODVmYjRkN2U2YTU1MTBiNWIxZGI0MDgzYWNmIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI3NTg3OTY0N2FmZDExNGM1MTI3Y2Q1Y2ViNzcyODRjMjNiNzBkYTE5NDJhNGE2NzU0NDRkNmNhZjEyY2MzZTM0In0"
+          "version": "repo-lines-v1:sha256:60f446cfa6d5a704979492c4b23ffe652b1d8487f68751f3b1ae536151e73a42:eyJzZWxlY3RlZExpbmVDb3VudCI6MzE1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwMzVhNGQ1NGU3ZGUxYTdmYjE3YjU4OTllNWFkMjMwMWMwZGEwODlhOGVkYmMxMWU4N2NlOGViNzFiMzcwMGZkIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI3NzJmOTY5NWM3NDY3Yzc0NzczYzljZTdmYzQyOWM1ZDBkMGU0ODdmM2M1MWQxNWQ2NjY4YTNkMjQwNzJiYjk1IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJjMTQyMzMyMGQ3N2NlMTg4MDY2OTBlZmRiOGUwOWZjNmU3MjZiODVmYjRkN2U2YTU1MTBiNWIxZGI0MDgzYWNmIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI3NTg3OTY0N2FmZDExNGM1MTI3Y2Q1Y2ViNzcyODRjMjNiNzBkYTE5NDJhNGE2NzU0NDRkNmNhZjEyY2MzZTM0In0"
         }
       ]
     },
@@ -259,6 +259,10 @@
         {
           "resource": "repo://libs/core/langchain_core/language_models/chat_models.py#L587-L643",
           "version": "repo-lines-v1:sha256:2bfd684462989559832648a165a2f3dc126ce1f8c9950d17125e7bfa8905c307:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJlMzJkOTYzMzc4ZDEyYWFhMzVmYzI5NTg1Y2FhZjBkZGE0MmYxM2Q2Mjg0N2ZhZDdhZmRjNmQ2YTRkMDhjNTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYjY1ZTg0OTdhNWE2NDJmN2I5MDE4MjEwZDY1Njk4NDkwOWRmNmNmMDg4MzNmMzcyNjNjNmFkOWJmZTlmZTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1ZjYyODhlYTM4N2E5NGMzODlmMTFlZTMzYzk3ZmIwZDZlNjRlODlkNTczNWQ2MzlhMTkzMzUzYTIxZjEwMjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2OGQxY2FkM2Y5N2UxMzk2MDZlYzlhOWQ0NTMyYzExZWNmZmY3MjMxMmU5ZGM5M2Y3YjU3YzZmY2U4N2ZlZmEifQ"
+        },
+        {
+          "resource": "repo://libs/core/langchain_core/language_models/chat_models.py#L645-L693",
+          "version": "repo-lines-v1:sha256:d4b692843c5be73ec2605c182505f21fc7d24a60da724d6b73c34b022f5443da:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVlZDEzZTU5NTg3Y2QzODI2MGI4MDJjYjFhYzhjYWI5ZGVhZDVjZmRiMzgwZDZjMmQyYWI3NmE2NGM0NTE5ZWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhZjg0ZGQ1YWY3MGExNDVkZGFiYjIwMDgxYTRjNjhkNjVhNjYwN2U2Y2NmYTZiZjRjNGI4YWQyZTE2ZjEyNjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE4ZTI5YTJkZWZjOTBjNDQzMmM5MmIzNWYxN2NmODMzMjlmZDIxMTRiODZmN2M5ZDUyZTlhYjJjYWU3NTZiYjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmYmUxNDAzNjcwZjU0OWI0ZmJjOWMxZjhiMmQzZDY4NDEyNmQxOTQxZWRkNzhlM2MxMTI2OTIxYmU3ZGIzNWUifQ"
         }
       ]
     },
@@ -389,6 +393,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.0",
-    "at": "2026-09-28T08:35:20.640Z"
+    "at": "2026-10-08T08:29:58.787Z"
   }
 }

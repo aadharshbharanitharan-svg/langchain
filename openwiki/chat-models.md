@@ -3,9 +3,6 @@ type: "Architecture"
 title: "Chat Model Interface and Lifecycle"
 description: "Document BaseChatModel protocol, input/output handling, streaming, and integration points with callbacks and model profiling. Covers the init_chat_model() factory, provider registry, and model instantiation."
 tags: [chat-models, llm-integration, streaming, structured-output, model-capabilities, model-initialization]
-verified:
-  - by: openwiki/0.5.0
-    at: 2026-09-28T08:35:20.640Z
 sources:
   - id: openwiki-source-132f3183693cd9cf79d029a5
     resource: repo://libs/core/langchain_core/language_models/base.py
@@ -17,7 +14,10 @@ sources:
     resource: repo://libs/core/langchain_core/language_models/model_profile.py
   - id: openwiki-source-c479d4fffee5cf62576699e4
     resource: repo://libs/langchain_v1/langchain/chat_models/base.py
-generated: { by: "openwiki/0.5.0", at: "2026-09-28T08:35:20.640Z" }
+generated: { by: "openwiki/0.5.0", at: "2026-10-08T08:29:58.787Z" }
+verified:
+  - by: openwiki/0.5.0
+    at: 2026-10-08T08:29:58.787Z
 ---
 
 ## Overview
@@ -155,6 +155,30 @@ Returns `False` (fallback to non-streaming) if:
 - `stream=False` explicitly
 - Streaming is not implemented and async falls back to sync
 
+### v2 Protocol Streaming Decision
+
+**`_should_use_protocol_streaming()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L587-L643`) determines whether to route invoke/generate through the v2 protocol events path:
+
+```python
+def _should_use_protocol_streaming(
+    self,
+    *,
+    async_api: bool,
+    run_manager: CallbackManagerForLLMRun | AsyncCallbackManagerForLLMRun | None = None,
+    **kwargs: Any,
+) -> bool
+```
+
+**Decision logic** (runs alongside `_should_stream` in `_generate_with_cache`; v2 takes precedence when both are true):
+
+1. **Opt-in via handler**: Returns `False` unless any attached handler is a `_V2StreamingCallbackHandler`
+2. **Event source availability**: Requires one of:
+   - Native `_stream_chat_model_events()` (sync) or `_astream_chat_model_events()` (async) hook
+   - Subclass override of `_stream()` (sync) or `_astream()` (async)
+   - Async can fall back to sync methods
+3. **Streaming not disabled**: Must pass `_streaming_disabled(**kwargs)` check
+4. **Returns `True`** if all conditions met; routes through `_iter_v2_events` which dispatches per-event via `on_stream_event` and returns a single `ChatResult` (preserving caching and `on_llm_end` on the existing generate path)
+
 ### Stream Implementation Methods
 
 **`_stream()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L2255-L2273`) is the sync streaming hook (optional override):
@@ -241,12 +265,15 @@ async def _agenerate(
 
 ### Cached Generation
 
-**`_generate_with_cache()`** and **`_agenerate_with_cache()`** wrap the core methods with:
+**`_generate_with_cache()`** and **`_agenerate_with_cache()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L1892-L2206`) wrap the core generation methods to provide transparent caching:
 
-1. **Prompt caching**: Checks if `self.cache` or global `get_llm_cache()` has cached results for the input
-2. **Cache hits**: Returns cached generations and replays them as v2 events if a v2 handler is attached
-3. **Cache misses**: Routes through streaming or non-streaming path
-4. **Protocol routing**: Dispatches to v2 events (`_should_use_protocol_streaming`) or v1 callback path (`_should_stream`)
+1. **Prompt caching**: Checks `self.cache` (if set to `BaseCache` instance) or global `get_llm_cache()` for cached results
+2. **Cache key generation**: Uses `_get_llm_string()` combined with normalized messages (with `id` fields stripped for stable keys)
+3. **Cache hits**: Returns cached generations and calls `_replay_v2_events_for_cache_hit()` if a `_V2StreamingCallbackHandler` is attached, ensuring consistent callback behavior
+4. **Cache misses**: Routes through v2 protocol streaming (`_should_use_protocol_streaming`), v1 callback streaming (`_should_stream`), or direct generation
+5. **Rate limiting**: Applied after cache check but before API call, allowing cache hits to bypass rate limiting
+6. **Cache update**: After generation succeeds, updates the cache via `llm_cache.update()` or `llm_cache.aupdate()`
+7. **Response metadata**: Merges `llm_output` and generation metadata into each message's `response_metadata`
 
 ### Batch Methods
 
@@ -263,6 +290,18 @@ def generate(
 ```
 
 Returns an `LLMResult` with generations grouped by input prompt and combined llm_output.
+
+## Message Normalization and Processing
+
+Before messages are passed to `_generate`, `_stream`, or `_astream`, they undergo normalization via **`_normalize_messages()`**:
+
+- **Message ID stripping**: Message `.id` fields are removed for stable cache keys (since IDs are runtime-generated)
+- **Content normalization**: Text strings in message lists are converted to appropriate message types (HumanMessage, etc.)
+- **Block transformation**: Content blocks are standardized to LangChain's unified format; provider-specific formats (e.g., Anthropic document blocks) are preserved via content block translators during API calls
+
+The `output_version` field controls how content is represented in streaming chunks and final messages:
+- **`v0` (default)**: Content remains in provider-specific format; lazy-parsed to standardized blocks via `content_blocks` property
+- **`v1`**: Content is proactively overwritten with standardized v1 format (list of content blocks) before yielding chunks or returning
 
 ## Callback Lifecycle
 
@@ -308,7 +347,31 @@ config = {
 result = model.invoke(input, config=config)
 ```
 
-Inheritable metadata and LangSmith params are extracted via `_get_invocation_params()` and `_get_ls_params()`.
+### LangSmith Tracing Parameters
+
+**`_get_ls_params()`** (`repo://libs/core/langchain_core/language_models/chat_models.py#L1502-L1566`) extracts tracing metadata for LangSmith:
+
+```python
+def _get_ls_params(
+    self, stop: list[str] | None = None, **kwargs: Any
+) -> LangSmithParams
+```
+
+**Returns a `LangSmithParams` dict with**:
+- **`ls_provider`**: Provider name (default: class name with "Chat" prefix/suffix stripped and lowercased; e.g., `ChatOpenAI` → `"openai"`)
+- **`ls_model_name`**: Model identifier (resolved from `kwargs["model"]`, then `self.model`, then `self.model_name`)
+- **`ls_temperature`**: Temperature parameter (from kwargs or instance attribute)
+- **`ls_max_tokens`**: Max output tokens (from kwargs or instance attribute)
+- **`ls_stop`**: Stop sequences (included if provided)
+- **`ls_model_type`**: Always `"chat"` for chat models
+- **`ls_integration`**: Always `"langchain_chat_model"` (added by `_get_ls_params_with_defaults`)
+
+**Subclass override guidance**: Override `_get_ls_params()` to:
+- Set stable `ls_provider` name (e.g., `"google_genai"` instead of auto-derived names)
+- Resolve `ls_model_name` from model-specific attribute names (e.g., `model_id`, `deployment_name`)
+- Honor per-call model overrides via `kwargs["model"]` for runtime model changes
+
+These parameters are included in LangSmith traces to enable provider/model filtering and model-specific analytics.
 
 ## Structured Output and Tool Binding
 

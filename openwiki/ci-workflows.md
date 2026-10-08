@@ -3,10 +3,9 @@ type: "Reference"
 title: "CI/CD Workflows: GitHub Actions and Release Process"
 description: "LangChain's GitHub Actions-based CI/CD system automating testing, linting, and release management across a monorepo with intelligent change detection, parallel matrix testing, and strict release gates."
 tags: [ci-cd, github-actions, testing, linting, release, pypi, monorepo, automation]
-verified:
-  - by: openwiki/0.5.0
-    at: 2026-09-28T08:35:20.640Z
 sources:
+  - id: openwiki-source-3638ff2c170b760df159d81b
+    resource: repo://.github/actions/uv_setup/action.yml
   - id: openwiki-source-34e57b5a3a0c875639ab72a7
     resource: repo://.github/scripts/check_diff.py
   - id: openwiki-source-f35e7c44cc1805709393a581
@@ -31,7 +30,12 @@ sources:
     resource: repo://.github/workflows/pr_labeler.yml
   - id: openwiki-source-12805fbf767dc2a3e238645e
     resource: repo://.github/workflows/pr_lint.yml
-generated: { by: "openwiki/0.5.0", at: "2026-09-28T08:35:20.640Z" }
+  - id: openwiki-source-4d1645cb6317345817452838
+    resource: repo://.pre-commit-config.yaml
+generated: { by: "openwiki/0.5.0", at: "2026-10-08T08:29:58.787Z" }
+verified:
+  - by: openwiki/0.5.0
+    at: 2026-10-08T08:29:58.787Z
 ---
 
 # CI/CD Workflows: GitHub Actions and Release Process
@@ -226,14 +230,66 @@ Scheduled daily (1 PM UTC) with manual dispatch override capability.
 
 **Job: `integration-tests`**:
 
-- Checks out primary monorepo plus external google-genai, google-vertexai, and langchain-aws repositories
-- Reorganizes external repos into local partner directories for unified testing
-- Authenticates to Google Cloud and AWS
-- Runs per-package `make integration_tests` with all live API credentials injected
+- Checks out primary monorepo plus external `langchain-google` (containing genai and vertexai) and `langchain-aws` repositories
+- Reorganizes external repos into local partner directories (`libs/partners/google-genai`, `libs/partners/google-vertexai`, `libs/partners/aws`) for unified testing
+- Authenticates to Google Cloud and AWS via respective GitHub Actions
+- Runs per-package `make integration_tests` with all live API credentials injected as environment variables
 - Uses concurrency locks per (package, python-version) to serialize same-package runs and prevent credential conflicts
-- Includes special installation logic: overlays local editable core and standard-tests packages atop checked-out partner versions
+- Installs dependencies via `uv sync --group test --group test_integration` for each package
+- Includes special per-package install logic: overlays local editable core and standard-tests packages atop checked-out partner versions (e.g., google-genai installs local core and standard-tests; google-vertexai adds langchain_v1; aws adds langchain, anthropic)
 
-**Credentials**: Receives 30+ environment variables covering OpenAI, Anthropic, Google, AWS, Azure, Groq, MistralAI, HuggingFace, Mistral, Together, Cohere, and more.
+**Credentials**: Receives 40+ environment variables covering OpenAI, Anthropic, Google, AWS, Azure, Groq, MistralAI, Deepseek, Cohere, HuggingFace, Together, Mistral, XAI, Perplexity, Upstage, Nvidia, Ollama, OpenRouter, Typesafe, Nomic, MongoDB, Elasticsearch, and LangSmith gateway/tracing.
+
+### External Repository Testing (`test-dependents` Job)
+
+Tests external packages (currently `deepagents`) against local branch versions:
+
+- Checks out external dependent repositories separately
+- Installs package with test dependencies via `uv sync --group test`
+- Overlays local core/langchain_v1 packages via `uv pip install -e` to test current branch code
+- Requires Python >= 3.11, uses bounded matrix from compute-matrix output
+- Ensures breaking changes caught before core releases
+
+## Local Development: Pre-Commit Hooks (`.pre-commit-config.yaml`)
+
+The monorepo uses pre-commit hooks to enforce code quality, formatting, and version consistency before commits reach CI. Hooks are automatically triggered on `git commit` after running `pre-commit install`.
+
+### Hook Categories
+
+**Standard validation** (via `pre-commit-hooks`):
+- YAML/TOML syntax validation
+- File ending verification (ensure newline at EOF)
+- Trailing whitespace removal
+- Protection against direct commits to `master` branch
+
+**Text normalization** (via `texthooks`):
+- Replace curly quotes with straight quotes (`fix-smartquotes`)
+- Replace non-standard spaces with regular spaces (`fix-spaces`)
+
+**Per-package format and lint** (via local hooks):
+- Each library directory (core, langchain, standard-tests, text-splitters, all partners) has a `format` and `lint` entry
+- Triggers `make -C libs/<package> format lint` when files in that package change
+- Enforces Ruff formatting and linting rules before commit
+- Applied before CI runs, preventing rejected PRs
+
+**Version consistency checks** (via local hooks):
+- Ensures `pyproject.toml` version matches source code constants for core, langchain_v1, and all partner packages
+- Triggers `make -C libs/<package> check_version` when `pyproject.toml` or version files change
+- Prevents version mismatches that would fail CI
+
+### Running Pre-Commit Manually
+
+```bash
+# Install hooks
+pre-commit install
+
+# Run all hooks on staged files (automatic before commit)
+git commit
+
+# Or manually trigger on specific files
+pre-commit run --all-files
+pre-commit run <hook-id> --all-files
+```
 
 ## Auto-Labeling Workflows
 
@@ -333,17 +389,24 @@ Two modes:
 
 ### Environment Variables
 
-**Frozen dependency control**:
-- `UV_FROZEN`: Prevents automatic dependency resolution
-- `UV_NO_SYNC`: Skips uv sync in build steps (manual sync used instead)
+**Frozen dependency control** (all CI jobs):
+- `UV_FROZEN=true`: Prevents automatic dependency resolution during CI
+- `UV_NO_SYNC=true`: Skips uv sync in certain build steps, using manual sync instead
 
-**Linting & formatting**:
-- `RUFF_OUTPUT_FORMAT: github`: Inline GitHub annotations for linter violations
+**Linting & formatting** (lint jobs):
+- `RUFF_OUTPUT_FORMAT=github`: Inline GitHub annotations for linter violations
 
-**LangSmith tracing** (optional):
-- `LANGSMITH_API_KEY`: Optional tracing of CI workflows themselves
-- `LANGCHAIN_TRACING_V2: true`: Enable tracing
-- `LANGCHAIN_PROJECT: openwiki`: LangSmith project name
+**LangSmith tracing** (integration tests):
+- `LANGSMITH_TRACING=true`: Enable trace collection
+- `LANGSMITH_API_KEY`: API credentials (from `environment: "Scheduled testing"`)
+- `LANGSMITH_PROJECT`: Project name (default `scheduled-testing-py`)
+- `LANGSMITH_GATEWAY`, `LANGSMITH_GATEWAY_API_KEY`: Optional gateway routing
+
+**Scheduled testing credential scoping**:
+- Integration tests run under `environment: "Scheduled testing"` GitHub environment
+- Restricts access to 40+ API secrets only to the `integration-tests` and `test-dependents` jobs
+- Prevents credential exposure to unrelated jobs
+- Required for scheduled runs but unused in PR CI (which can manually override if needed)
 
 ### GitHub Actions Permissions
 
@@ -359,10 +422,13 @@ Isolated jobs (build, testing) receive no write permissions; publishing jobs run
 ### Custom Actions
 
 **`uv_setup`** (`.github/actions/uv_setup`):
-- Sets up Python via official `setup-python` action
-- Configures `uv` tool with optional caching
+- Sets up Python and installs `uv` via `astral-sh/setup-uv@v7`
+- Pins `uv` version to `0.12.21` for reproducibility
+- Enables optional caching for dependency graphs via cache-dependency-glob:
+  - `pyproject.toml` and `uv.lock` (primary)
+  - `requirements*.txt` (fallback)
 - Supports per-package cache suffixes to avoid cross-contamination
-- Parameters: `python-version`, `cache-suffix`, `working-directory`, `enable-cache`
+- Parameters: `python-version` (required, MAJOR.MINOR only), `enable-cache` (default true), `cache-suffix`, `working-directory` (default `**`)
 
 ## Important Invariants & Failure Modes
 
